@@ -1038,7 +1038,7 @@
   white-space: nowrap;
 }
 .chat-floating-ctx-menu {
-  position: fixed;
+  position: absolute;
   right: auto !important;
   bottom: auto !important;
   transform: none !important;
@@ -1100,20 +1100,20 @@
 }
 
 .chat-room-context-menu.ctx-menu {
-  --ctx-menu-bg: rgba(248, 245, 246, 0.78);
-  width: min(312px, calc(100vw - 24px));
-  max-width: calc(100vw - 24px);
-  max-height: calc(100dvh - 16px);
-  padding: 10px;
-  border: 1px solid rgba(232, 217, 217, 0.7);
-  border-radius: 24px;
+  --ctx-menu-bg: rgba(250, 246, 248, 0.68);
+  width: max-content;
+  max-width: min(292px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  padding: 8px;
+  border: 1px solid rgba(225, 214, 218, 0.48);
+  border-radius: 19px;
   background: var(--ctx-menu-bg);
   box-shadow:
-    0 12px 30px rgba(15, 23, 42, 0.14),
-    0 3px 10px rgba(15, 23, 42, 0.07),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  backdrop-filter: blur(22px) saturate(150%);
+    0 8px 20px rgba(15, 23, 42, 0.1),
+    0 2px 6px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
   white-space: normal;
   overflow-x: visible;
   overflow-y: auto;
@@ -1124,7 +1124,7 @@
 .chat-context-menu-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .chat-room-context-menu .ctx-menu-triangle {
@@ -1133,19 +1133,19 @@
 
 .chat-room-context-menu .ctx-menu-btn {
   min-width: 0;
-  min-height: 60px;
-  padding: 7px 4px;
+  min-height: 52px;
+  padding: 6px 3px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  border: 1px solid rgba(225, 214, 218, 0.52);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.58);
-  color: #4a3f3f;
+  gap: 3px;
+  border: 1px solid rgba(225, 214, 218, 0.38);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.28);
+  color: #51494a;
   font-family: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: calc(13px*var(--app-text-scale,1));
+  font-size: calc(11.5px*var(--app-text-scale,1));
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.18;
@@ -1170,7 +1170,7 @@
 }
 
 .chat-room-context-menu .ctx-menu-btn-danger {
-  color: #e5484d;
+  color: #d84f57;
 }
 
 @keyframes chat-context-backdrop-in {
@@ -1185,10 +1185,9 @@
 
 @media (max-width: 350px) {
   .chat-room-context-menu.ctx-menu {
-    width: min(312px, calc(100vw - 16px));
-    max-width: calc(100vw - 16px);
-    padding: 10px;
-    border-radius: 22px;
+    max-width: calc(100% - 12px);
+    padding: 7px;
+    border-radius: 18px;
   }
 
   .chat-context-menu-grid {
@@ -1196,8 +1195,8 @@
   }
 
   .chat-room-context-menu .ctx-menu-btn {
-    min-height: 58px;
-    font-size: calc(12px*var(--app-text-scale,1));
+    min-height: 50px;
+    font-size: calc(11px*var(--app-text-scale,1));
   }
 }
 

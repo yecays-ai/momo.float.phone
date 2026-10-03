@@ -1438,8 +1438,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const anchor = contextMenuAnchor;
         if (!anchor) return { left: 0, top: 0 };
         if (anchor.element) {
-            const rect = anchor.element.getBoundingClientRect();
-            return { left: rect.left, top: rect.bottom + 10, visibility: "hidden" as const };
+            return { left: 0, top: 0, visibility: "hidden" as const };
         }
         return { left: anchor.x, top: Math.max(8, anchor.y - 90) };
     };
@@ -1452,32 +1451,37 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const anchor = contextMenuAnchor;
         if (anchor.element) {
             const position = () => {
-                if (!el.isConnected || !anchor.element?.isConnected) return;
+                const viewport = wrapperRef.current;
+                if (!el.isConnected || !anchor.element?.isConnected || !viewport) return;
                 const rect = anchor.element.getBoundingClientRect();
-                const viewport = window.visualViewport;
-                const viewportLeft = viewport?.offsetLeft ?? 0;
-                const viewportTop = viewport?.offsetTop ?? 0;
-                const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
-                const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
-                const bubbleGap = 10;
-                el.style.maxWidth = `${Math.max(0, viewportRight - viewportLeft - margin * 2)}px`;
-                el.style.maxHeight = `${Math.max(0, viewportBottom - viewportTop - margin * 2)}px`;
+                const viewportRect = viewport.getBoundingClientRect();
+                const scaleX = viewportRect.width / viewport.clientWidth || 1;
+                const scaleY = viewportRect.height / viewport.clientHeight || 1;
+                const bubbleLeft = (rect.left - viewportRect.left) / scaleX;
+                const bubbleRight = (rect.right - viewportRect.left) / scaleX;
+                const bubbleTop = (rect.top - viewportRect.top) / scaleY;
+                const bubbleBottom = (rect.bottom - viewportRect.top) / scaleY;
+                const viewportWidth = viewport.clientWidth;
+                const viewportHeight = viewport.clientHeight;
+                const bubbleGap = 9;
+                el.style.maxWidth = `${Math.max(0, viewportWidth - margin * 2)}px`;
+                el.style.maxHeight = `${Math.max(0, viewportHeight - margin * 2)}px`;
                 const naturalHeight = el.scrollHeight + el.offsetHeight - el.clientHeight;
-                const below = Math.max(0, viewportBottom - margin - Math.max(rect.bottom + bubbleGap, viewportTop + margin));
-                const above = Math.max(0, Math.min(rect.top - bubbleGap, viewportBottom - margin) - viewportTop - margin);
+                const below = Math.max(0, viewportHeight - margin - Math.max(bubbleBottom + bubbleGap, margin));
+                const above = Math.max(0, Math.min(bubbleTop - bubbleGap, viewportHeight - margin) - margin);
                 const placeBelow = naturalHeight <= below || (naturalHeight > above && below >= above);
                 const availableHeight = placeBelow ? below : above;
                 el.style.maxHeight = `${availableHeight}px`;
                 el.style.overflowY = "auto";
                 const menuWidth = el.offsetWidth;
-                const left = Math.max(viewportLeft + margin, Math.min(
-                    (rect.left + rect.right - menuWidth) / 2,
-                    viewportRight - margin - menuWidth,
+                const left = Math.max(margin, Math.min(
+                    (bubbleLeft + bubbleRight - menuWidth) / 2,
+                    viewportWidth - margin - menuWidth,
                 ));
                 el.style.left = `${left}px`;
                 el.style.top = `${placeBelow
-                    ? Math.max(rect.bottom + bubbleGap, viewportTop + margin)
-                    : Math.min(rect.top - bubbleGap, viewportBottom - margin) - el.offsetHeight}px`;
+                    ? Math.max(bubbleBottom + bubbleGap, margin)
+                    : Math.min(bubbleTop - bubbleGap, viewportHeight - margin) - el.offsetHeight}px`;
                 el.style.right = "auto";
                 el.style.bottom = "auto";
                 el.style.visibility = "visible";
@@ -5106,7 +5110,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     /** Reusable context menu for user/assistant bubbles */
     const renderBubbleContextMenu = (m: ChatMessage, options?: { allowMultiSelect?: boolean }) => {
         const storedMessageId = getStoredActionMessageId(m);
-        const menuIconProps = { size: 22, strokeWidth: 1.75, "aria-hidden": true as const };
+        const menuIconProps = { size: 19, strokeWidth: 1.75, "aria-hidden": true as const };
         const menu = (
             <div
                 onPointerDown={e => e.stopPropagation()}
@@ -5766,7 +5770,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                             }
                                         }}
-                                        onContextMenu={(e) => { e.preventDefault(); openOfflineContextMenu({ turnId: turn.id, role: "user" }, { x: e.clientX, y: e.clientY }); }}
+                                        onContextMenu={(e) => { e.preventDefault(); openOfflineContextMenu({ turnId: turn.id, role: "user" }, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                         {...(activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "user" ? { "data-active": "" } : {})}
                                     >
                                         {activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "user" && renderOfflineContextMenu(turn, "user")}
@@ -5801,6 +5805,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                     openOfflineContextMenu({ turnId: turn.id, role: "assistant" }, {
                                                         x: rect.left + rect.width / 2,
                                                         y: rect.bottom,
+                                                        element: e.currentTarget.closest<HTMLElement>(".chat-offline-entry")?.querySelector<HTMLElement>(".chat-offline-text") ?? e.currentTarget,
                                                     });
                                                 }}
                                             >
@@ -5834,7 +5839,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                             }
                                         }}
-                                        onContextMenu={(e) => { e.preventDefault(); openOfflineContextMenu({ turnId: turn.id, role: "assistant" }, { x: e.clientX, y: e.clientY }); }}
+                                        onContextMenu={(e) => { e.preventDefault(); openOfflineContextMenu({ turnId: turn.id, role: "assistant" }, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                         {...(activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "assistant" ? { "data-active": "" } : {})}
                                     >
                                         {activeOfflineTarget?.turnId === turn.id && activeOfflineTarget.role === "assistant" && renderOfflineContextMenu(turn, "assistant")}
