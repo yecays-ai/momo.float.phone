@@ -9,6 +9,8 @@ import { parseAIResponse, type ParsedMessagePart } from "@/lib/rich-message-pars
 import { isKnownStickerLabel } from "@/lib/sticker-data";
 import { translateReasoningText } from "@/lib/reasoning-translate";
 import { MessageBubble, MediaDetailModal, prewarmStickerCache, BilingualTextBlock, isStandaloneHtmlPreviewContent, normalizeTextBubbleContent } from "./message-bubble";
+import { MessageAnnotations } from "./message-annotations";
+import { LOCAL_REACTION_ACTOR, MESSAGE_REACTION_CHOICES, sameReactionActor } from "@/lib/message-annotations";
 import { GeneratedImageErrorDialog } from "./generated-image-error-dialog";
 import { PhotoInputModal, TextPhotoModal, VoiceRecordModal, RedPacketModal, LocationInputModal, SystemInstructionModal } from "./rich-input-modals";
 import { EmojiPanel, StickerPanel } from "./emoji-panel";
@@ -1310,6 +1312,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     // Message Actions state
     const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
+    const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
     const [contextMenuAnchor, setContextMenuAnchor] = useState<ContextMenuAnchor | null>(null);
     const contextMenuPositionRef = useRef<(() => void) | null>(null);
     const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
@@ -1417,12 +1420,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     }, [applyStoredMessageWindow, session.id]);
 
     const closeContextMenu = () => {
+        setReactionPickerMessageId(null);
         setActiveMessageId(null);
         setActiveOfflineTarget(null);
         setContextMenuAnchor(null);
     };
 
     const openMessageContextMenu = (msgId: string, anchor: ContextMenuAnchor) => {
+        setReactionPickerMessageId(null);
         setActiveOfflineTarget(null);
         setContextMenuAnchor(anchor);
         setActiveMessageId(msgId);
@@ -5107,16 +5112,41 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return "displaySourceId" in msg && msg.displaySourceId ? msg.displaySourceId : msg.id;
     };
 
+    const handleMessageReaction = (messageId: string, emoji: string) => {
+        const updated = reactToChatMessage(messageId, LOCAL_REACTION_ACTOR, emoji);
+        if (updated) setMessages(previous => previous.map(message => message.id === updated.id ? updated : message));
+        closeContextMenu();
+    };
+
     /** Preserve the existing portal, highlight and container positioning. */
     const renderBubbleContextMenu = (m: ChatMessage, options?: { allowMultiSelect?: boolean }) => {
         const storedMessageId = getStoredActionMessageId(m);
         const canAnnotate = !isTransientMessage(m) && m.id === storedMessageId;
+        const choosingReaction = reactionPickerMessageId === m.id;
+        const ownReaction = m.reactions?.find(reaction => sameReactionActor(reaction.actor, LOCAL_REACTION_ACTOR));
         const menuIconProps = { size: 19, strokeWidth: 1.75, "aria-hidden": true as const };
         const pluginActions = getChatPluginRuntime().getMessageActions(m);
         const menu = (
             <div onPointerDown={event => event.stopPropagation()}
                 ref={positionFloatingContextMenu} style={getContextMenuInitialStyle()}
                 className="ctx-menu chat-floating-ctx-menu chat-room-context-menu" data-role={m.role}>
+                {choosingReaction ? (
+                    <div className="chat-reaction-picker" aria-label="Choose a reaction">
+                        <div className="chat-reaction-picker-header">
+                            <button type="button" onClick={() => setReactionPickerMessageId(null)} aria-label="Back to message actions"><ChevronLeft size={16} /></button>
+                            <span>React</span>
+                        </div>
+                        <div className="chat-context-menu-grid">
+                            {MESSAGE_REACTION_CHOICES.map(emoji => (
+                                <button key={emoji} type="button" className="ctx-menu-btn chat-reaction-choice"
+                                    aria-label={emoji} aria-pressed={ownReaction?.emoji === emoji}
+                                    onClick={() => handleMessageReaction(storedMessageId, emoji)}>{emoji}</button>
+                            ))}
+                        </div>
+                        {ownReaction && <button type="button" className="chat-reaction-remove"
+                            onClick={() => handleMessageReaction(storedMessageId, ownReaction.emoji)}>Remove reaction</button>}
+                    </div>
+                ) : (
                     <>
                         <div className="chat-context-menu-grid">
                             <button type="button" className="ctx-menu-btn" onClick={() => { copyTextToClipboard(m.content); closeContextMenu(); }}>
@@ -5128,7 +5158,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             <button type="button" className="ctx-menu-btn" onClick={() => { setQuotingMessage(m); closeContextMenu(); }}>
                                 <Quote {...menuIconProps} /><span>Quote</span>
                             </button>
-                            <button type="button" className="ctx-menu-btn" disabled title="Reaction picker coming next">
+                            <button type="button" className="ctx-menu-btn" disabled={!canAnnotate} onClick={() => setReactionPickerMessageId(m.id)}>
                                 <Smile {...menuIconProps} /><span>React</span>
                             </button>
                             <button type="button" className="ctx-menu-btn" disabled={options?.allowMultiSelect === false} onClick={() => startMultiSelectFromMessage(m)}>
@@ -5158,6 +5188,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             ))}
                         </div>}
                     </>
+                )}
                 <div data-menu-triangle className="ctx-menu-triangle absolute -top-[6px] w-0 h-0" />
             </div>
         );
@@ -6292,6 +6323,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 defaultTranslationExpanded={session.collapseBilingualTranslation !== false ? false : true}
                                             />
                                         </div>
+                                        <MessageAnnotations message={renderMsg} onReact={msg.id === getStoredActionMessageId(msg) && !isTransientMessage(msg) ? emoji => handleMessageReaction(getStoredActionMessageId(msg), emoji) : undefined} />
                                         </div>}
                                         {msg.role !== "user" && !isSilentThought && !isEmptyBubble && hasFoldedPanel && (
                                             <button
