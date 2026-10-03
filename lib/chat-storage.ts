@@ -11,6 +11,7 @@ import { resolveUserIdentity } from "./settings-storage";
 import { loadCharacters, saveCharacters } from "./character-storage";
 import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 import { emitChatPluginEvent, runChatPluginTransformSync } from "./chat-plugin-hooks";
+import { toggleMessageReaction, preserveMessageAnnotations, type MessageReactionActor } from "./message-annotations";
 import { parseAIResponse } from "./rich-message-parser";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
 import { findUserAvatarChangeIntent, inferAvatarDecisionFromReply } from "./chat-avatar-intent";
@@ -105,6 +106,8 @@ export type NativeToolCallRecord = { id: string; name: string; args: Record<stri
 export type NativeToolResultRecord = { toolCallId: string; name: string; content: string };
 
 export type ChatMessage = {
+    reactions?: import("./message-annotations").MessageReaction[];
+    favoritedAt?: string; // ISO timestamp; absence means not favorited
     id: string;
     sessionId: string;
     role: ChatMessageRole;
@@ -2164,7 +2167,7 @@ export async function persistMessageVoiceAudio(
 
 export function updateChatMessage(
     messageId: string,
-    patch: Partial<Pick<ChatMessage, "content" | "mediaType" | "mediaUrl" | "mediaData">>,
+    patch: Partial<Pick<ChatMessage, "content" | "mediaType" | "mediaUrl" | "mediaData" | "reactions" | "favoritedAt">>,
 ): ChatMessage | null {
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx === -1) return null;
@@ -2184,6 +2187,24 @@ export function updateChatMessage(
     emitChatPluginEvent("message.updated", { id: messageId, patch });
 
     return updated;
+}
+
+/** Patch the latest stored bubble, so another actor's reaction is never overwritten by stale UI. */
+export function reactToChatMessage(messageId: string, actor: MessageReactionActor, emoji: string): ChatMessage | null {
+    const message = _loadAllMessages().find(item => item.id === messageId);
+    if (!message) return null;
+    return updateChatMessage(messageId, { reactions: toggleMessageReaction(message.reactions, actor, emoji) });
+}
+
+export function toggleChatMessageFavorite(messageId: string): ChatMessage | null {
+    const message = _loadAllMessages().find(item => item.id === messageId);
+    if (!message) return null;
+    return updateChatMessage(messageId, { favoritedAt: message.favoritedAt ? undefined : new Date().toISOString() });
+}
+
+export function loadChatFavorites(sessionId: string): ChatMessage[] {
+    return loadChatMessages(sessionId).filter(message => !!message.favoritedAt)
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || compareChatMessages(b, a));
 }
 
 function replacePhotoDirectiveDescription(
@@ -2302,6 +2323,8 @@ export function replaceMessageWithParts(
             rawResponseText: original.rawResponseText,
             responseRoundId: original.responseRoundId,
             editableResponseText: original.editableResponseText,
+            reactions: i === 0 ? original.reactions : undefined,
+            favoritedAt: i === 0 ? original.favoritedAt : undefined,
             statusPanel: i === 0 ? original.statusPanel : undefined,
             innerMonologue: i === 0 ? original.innerMonologue : undefined,
             reasoningText: i === 0 ? original.reasoningText : undefined,
@@ -2355,7 +2378,7 @@ export function replaceResponseBatchWithParts(
     dbDeleteMessagesByIds(deletedIds);
 
     const baseTime = new Date(firstMessage.createdAt).getTime();
-    const visibleMessages: ChatMessage[] = parts.map((part, index) => ({
+    const visibleMessages: ChatMessage[] = preserveMessageAnnotations(batchMessages, parts.map((part, index) => ({
         id: createMessageId(),
         sessionId,
         role: firstMessage.role,
@@ -2382,7 +2405,7 @@ export function replaceResponseBatchWithParts(
         followUpIndex: firstMessage.followUpIndex,
         senderCharacterId: firstMessage.senderCharacterId,
         senderName: firstMessage.senderName,
-    }));
+    })));
     const toolCallContent = options?.toolCallContent?.trim();
     const toolCallMessage: ChatMessage | undefined = toolCallContent
         ? {
@@ -2477,7 +2500,7 @@ export function replaceGroupResponseRound(
     dbDeleteMessagesByIds(deletedIds);
 
     const baseTime = new Date(firstMessage.createdAt).getTime();
-    const newMessages: ChatMessage[] = messages.map((msg, index) => ({
+    const newMessages: ChatMessage[] = preserveMessageAnnotations(roundMessages, messages.map((msg, index) => ({
         id: createMessageId(),
         sessionId,
         role: firstMessage.role,
@@ -2502,7 +2525,7 @@ export function replaceGroupResponseRound(
         followUpIndex: firstMessage.followUpIndex,
         senderCharacterId: msg.senderCharacterId,
         senderName: msg.senderName,
-    }));
+    })));
 
     _messagesCache.splice(insertIdx, 0, ...newMessages);
     dbPutMessages(newMessages);

@@ -11,6 +11,8 @@ import {
     saveChatSessions,
     loadChatSessions,
     loadChatMessages,
+    loadChatFavorites,
+    toggleChatMessageFavorite,
     loadChatContacts,
     getChatMessagePreview,
     pushChatMessage,
@@ -51,7 +53,7 @@ import { getSchemes, saveScheme, deleteScheme, type CSSScheme } from "@/lib/css-
 import { CustomStatusFrame } from "@/components/chat/custom-status-frame";
 import { KeyboardAutoSendDebounceItem } from "@/components/chat/keyboard-auto-send-debounce-item";
 import { SessionChatSoundsSection } from "@/components/chat/session-chat-sounds";
-import { ChevronRight, Image as ImageIcon, Video, Mic, UserMinus, UserPlus, Users, Pin, Ban, MessageSquare, Search, AlertCircle, Code, Laptop, Trash2, Smile, Sparkles, X, Play, Upload, Download, Save, FolderOpen, Camera, RefreshCw, type LucideIcon } from "lucide-react";
+import { Star, ChevronRight, Image as ImageIcon, Video, Mic, UserMinus, UserPlus, Users, Pin, Ban, MessageSquare, Search, AlertCircle, Code, Laptop, Trash2, Smile, Sparkles, X, Play, Upload, Download, Save, FolderOpen, Camera, RefreshCw, type LucideIcon } from "lucide-react";
 import { BINDING_ACCENTS, CONTENT_APP_ACCENTS } from "@/lib/ui-accent-colors";
 import CSSSchemeBar from "@/components/ui/css-scheme-picker";
 import { ConfirmDialog } from "@/components/ui/modal";
@@ -457,6 +459,8 @@ export function ChatSettingsPanel({
     const [editingBilingualPrompt, setEditingBilingualPrompt] = useState(false);
     const [editingCSS, setEditingCSS] = useState(false);
     const [showScreenEffects, setShowScreenEffects] = useState(false);
+    const [showFavorites, setShowFavorites] = useState(false);
+    const [favoriteMessages, setFavoriteMessages] = useState<ChatMessage[]>([]);
     const [showSearch, setShowSearch] = useState(false);
     // TA 的电脑：翻看角色云端电脑（连接了角色电脑才显示入口）
     const [showComputer, setShowComputer] = useState(false);
@@ -929,11 +933,10 @@ export function ChatSettingsPanel({
     };
 
     const jumpToSearchMessage = (messageId: string) => {
-        if (onJumpToMessage) {
-            onJumpToMessage(messageId);
-        }
         closeSearchPanel();
+        setShowFavorites(false);
         onClose();
+        onJumpToMessage?.(messageId);
     };
 
     const renderSearchMessage = (msg: ChatMessage) => {
@@ -1097,6 +1100,11 @@ export function ChatSettingsPanel({
                             </div>
                         </button>
                     )}
+                    <button className="menu-item" onClick={() => { setFavoriteMessages(loadChatFavorites(session.id)); setShowFavorites(true); }}>
+                        <ChatInfoIcon icon={Star} color={BINDING_ACCENTS.preset} />
+                        <div className="menu-label-group"><span className="menu-label">Favorites</span><span className="menu-desc">当前会话的收藏消息</span></div>
+                        <div className="menu-right"><ChevronRight size={16} /></div>
+                    </button>
                     <button className="menu-item" onClick={openSearchPanel}>
                         <ChatInfoIcon icon={Search} color={BINDING_ACCENTS.api} />
                         <div className="menu-label-group"><span className="menu-label">查找聊天记录</span></div>
@@ -1935,6 +1943,22 @@ export function ChatSettingsPanel({
             )}
 
             {/* Sub-page: Search History */}
+            {showFavorites && (
+                <div className="absolute inset-0 z-[101]">
+                    <PageShell title="Favorites" onBack={() => setShowFavorites(false)}>
+                        <div className="flex flex-col gap-5 p-4">
+                            {favoriteMessages.length === 0 && <div className="ui-empty"><span className="menu-desc">还没有收藏消息。长按气泡，选择 Favorite 即可收藏。</span></div>}
+                            {favoriteMessages.map(message => (
+                                <div key={message.id} className="flex flex-col gap-2">
+                                    {renderSearchMessage(message)}
+                                    <button type="button" className="ui-btn ui-btn-ghost self-end" aria-label="Remove favorite"
+                                        onClick={() => { toggleChatMessageFavorite(message.id); setFavoriteMessages(loadChatFavorites(session.id)); }}>取消收藏</button>
+                                </div>
+                            ))}
+                        </div>
+                    </PageShell>
+                </div>
+            )}
             {showSearch && (
                 <div style={{ position: "absolute", inset: 0, zIndex: 9999, background: "#ffffff" }}>
                 <div style={{ position: "absolute", inset: 0, background: "var(--c-page-body-bg)" }}>

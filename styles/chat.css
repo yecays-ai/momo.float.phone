@@ -1102,7 +1102,8 @@
 .chat-room-context-menu.ctx-menu {
   --ctx-menu-bg: rgba(250, 246, 248, 0.68);
   width: max-content;
-  max-width: min(292px, calc(100% - 16px));
+  width: 324px;
+  max-width: calc(100% - 16px);
   max-height: calc(100% - 16px);
   padding: 8px;
   border: 1px solid rgba(225, 214, 218, 0.48);
@@ -1124,7 +1125,7 @@
 .chat-context-menu-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  gap: 8px;
 }
 
 .chat-room-context-menu .ctx-menu-triangle {
@@ -1133,8 +1134,8 @@
 
 .chat-room-context-menu .ctx-menu-btn {
   min-width: 0;
-  min-height: 52px;
-  padding: 6px 3px 5px;
+  min-height: 58px;
+  padding: 8px 3px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1145,7 +1146,7 @@
   background: rgba(255, 255, 255, 0.28);
   color: #51494a;
   font-family: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: calc(11.5px*var(--app-text-scale,1));
+  font-size: calc(10.5px*var(--app-text-scale,1));
   font-weight: 500;
   letter-spacing: -0.015em;
   line-height: 1.18;
@@ -7416,3 +7417,16 @@
   background: currentColor;
   animation: chat-stream-cursor-blink 1s steps(2, start) infinite;
 }
+
+/* Message annotations live outside bubble contents and plugin slots. */
+.chat-room-context-menu .ctx-menu-btn:disabled { opacity: .38; cursor: default; }
+.chat-room-context-menu .ctx-menu-btn[aria-pressed="true"] { background: rgba(255, 218, 232, .7); }
+.chat-context-plugin-actions { border-top: 1px solid rgba(225, 214, 218, .5); padding-top: 8px; margin-top: 8px; }
+.chat-reaction-picker-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.chat-reaction-picker-header button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; }
+.chat-room-context-menu .chat-reaction-choice { font-size: 24px; }
+.chat-reaction-remove { display: block; width: 100%; padding: 10px 4px 2px; font-size: 11px; color: #9b526a; }
+.chat-message-annotations { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.chat-msg-wrapper[data-role="user"] .chat-message-annotations { justify-content: flex-end; }
+.chat-message-reaction { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; min-height: 26px; padding: 2px 7px; border-radius: 13px; border: 1px solid rgba(216, 170, 190, .35); background: rgba(255, 246, 250, .88); font-size: 15px; line-height: 1.3; box-shadow: 0 2px 6px rgba(98, 58, 73, .08); }
+.chat-message-favorite { color: #ad6682; font-size: 17px; padding: 0 3px; }

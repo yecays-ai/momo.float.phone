@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChatSession, ChatMessage, CHAT_APP_SETTINGS_UPDATED_EVENT, CHAT_INITIAL_VISIBLE_MESSAGE_COUNT, CHAT_LOAD_MORE_MESSAGE_COUNT, CHAT_REQUEST_REPLY_EVENT, loadChatAppSettings, loadChatMessages, loadChatContacts, loadChatSessions, saveChatSessions, pushChatMessage, updateChatMessage, deleteChatMessage, deleteChatMessagesFrom, deleteChatMessagesByIds, retractChatMessage, editChatMessage, updateMessageMediaData, replaceResponseBatchWithParts, replaceGroupResponseRound, isReadingDiscussMessage, isSystemInstructionMessage, getSystemInstructionDisplayContent, createResponseBatchId, createResponseRoundId, getLatestStateValues, getLatestCharacterStateValues, compareChatMessages, isSessionStreamingEnabled, resolveChatBackgroundImage, resolveChatUserAvatar } from "@/lib/chat-storage";
+import { ChatSession, ChatMessage, CHAT_APP_SETTINGS_UPDATED_EVENT, CHAT_INITIAL_VISIBLE_MESSAGE_COUNT, CHAT_LOAD_MORE_MESSAGE_COUNT, CHAT_REQUEST_REPLY_EVENT, loadChatAppSettings, loadChatMessages, loadChatContacts, loadChatSessions, saveChatSessions, pushChatMessage, updateChatMessage, reactToChatMessage, toggleChatMessageFavorite, deleteChatMessage, deleteChatMessagesFrom, deleteChatMessagesByIds, retractChatMessage, editChatMessage, updateMessageMediaData, replaceResponseBatchWithParts, replaceGroupResponseRound, isReadingDiscussMessage, isSystemInstructionMessage, getSystemInstructionDisplayContent, createResponseBatchId, createResponseRoundId, getLatestStateValues, getLatestCharacterStateValues, compareChatMessages, isSessionStreamingEnabled, resolveChatBackgroundImage, resolveChatUserAvatar } from "@/lib/chat-storage";
 import { cleanStreamText, splitStreamPreviewSegments, stripLiteralTexts, stripXmlTagBlocks } from "@/lib/stream-preview";
 import type { StateValue } from "@/lib/chat-storage";
 import { parseStateValues, mergeStateValues } from "@/lib/state-value-parser";
@@ -52,7 +52,7 @@ import { useKeyboardDismissAutoSend } from "@/components/chat/use-keyboard-dismi
 import { cancelBailoutKey } from "@/lib/push-bailout-client";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import type { UserIdentity } from "@/components/settings/user-identity";
-import { AlertCircle, Blocks, Check, Copy, FilePenLine, FileText, ListChecks, ListX, Quote, RotateCcw, Trash2, Undo2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
+import { Smile, Star, AlertCircle, Blocks, Check, Copy, FilePenLine, FileText, ListChecks, ListX, Quote, RotateCcw, Trash2, Undo2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
 import { setDebugChatState } from "@/lib/debug-store";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { setChatActive } from "@/lib/music-action-queue";
@@ -5107,99 +5107,57 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return "displaySourceId" in msg && msg.displaySourceId ? msg.displaySourceId : msg.id;
     };
 
-    /** Reusable context menu for user/assistant bubbles */
+    /** Preserve the existing portal, highlight and container positioning. */
     const renderBubbleContextMenu = (m: ChatMessage, options?: { allowMultiSelect?: boolean }) => {
         const storedMessageId = getStoredActionMessageId(m);
+        const canAnnotate = !isTransientMessage(m) && m.id === storedMessageId;
         const menuIconProps = { size: 19, strokeWidth: 1.75, "aria-hidden": true as const };
+        const pluginActions = getChatPluginRuntime().getMessageActions(m);
         const menu = (
-            <div
-                onPointerDown={e => e.stopPropagation()}
-                ref={positionFloatingContextMenu}
-                style={getContextMenuInitialStyle()}
-                className="ctx-menu chat-floating-ctx-menu chat-room-context-menu"
-                data-role={m.role}>
-                <div className="chat-context-menu-grid">
-                    <button onClick={() => {
-                        const text = m.content;
-                        const fallbackCopy = () => {
-                            const ta = document.createElement("textarea");
-                            ta.value = text;
-                            ta.style.cssText = "position:fixed;left:-9999px;top:-9999px;opacity:0";
-                            document.body.appendChild(ta);
-                            ta.focus();
-                            ta.select();
-                            try { document.execCommand("copy"); } catch {}
-                            document.body.removeChild(ta);
-                        };
-                        if (navigator.clipboard?.writeText) {
-                            navigator.clipboard.writeText(text).catch(fallbackCopy);
-                        } else {
-                            fallbackCopy();
-                        }
-                        setActiveMessageId(null);
-                    }} className="ctx-menu-btn">
-                        <Copy {...menuIconProps} />
-                        <span>复制</span>
-                    </button>
-                    <button onClick={() => (m.role === "assistant" ? handleEditResponseStart(m) : handleEditMessageStart(m))} className="ctx-menu-btn">
-                        <FilePenLine {...menuIconProps} />
-                        <span>{m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}</span>
-                    </button>
-                    {m.mediaType === "audio" && m.mediaData?.label && (
-                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">
-                            <FileText {...menuIconProps} />
-                            <span>转文字</span>
-                        </button>
-                    )}
-                    {m.role === "user" && (
-                        <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">
-                            <Undo2 {...menuIconProps} />
-                            <span>撤回消息</span>
-                        </button>
-                    )}
-                    {m.role === "assistant" && (
-                        <button onClick={() => handleRetry(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
-                            <RotateCcw {...menuIconProps} />
-                            <span>重试以下</span>
-                        </button>
-                    )}
-                    <button onClick={() => { setQuotingMessage(m); setActiveMessageId(null); }} className="ctx-menu-btn">
-                        <Quote {...menuIconProps} />
-                        <span>引用</span>
-                    </button>
-                    {options?.allowMultiSelect !== false && (
-                        <button onClick={() => startMultiSelectFromMessage(m)} className="ctx-menu-btn">
-                            <ListChecks {...menuIconProps} />
-                            <span>多选</span>
-                        </button>
-                    )}
-                    <button onClick={() => handleDeleteMessage(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
-                        <Trash2 {...menuIconProps} />
-                        <span>删除</span>
-                    </button>
-                    <button onClick={() => handleDeleteMessagesFrom(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
-                        <ListX {...menuIconProps} />
-                        <span>删除以下</span>
-                    </button>
-                {(() => {
-                    // 聊天插件注册的消息操作菜单项
-                    const pluginActions = getChatPluginRuntime().getMessageActions(m);
-                    if (pluginActions.length === 0) return null;
-                    return pluginActions.map(action => (
-                        <button
-                            key={`${action.pluginId}:${action.id}`}
-                            className="ctx-menu-btn"
-                            onClick={() => {
-                                getChatPluginRuntime().runMessageAction(action, m);
-                                setActiveMessageId(null);
-                            }}
-                        >
-                            <Blocks {...menuIconProps} />
-                            <span>{action.label}</span>
-                        </button>
-                    ));
-                })()}
-                </div>
+            <div onPointerDown={event => event.stopPropagation()}
+                ref={positionFloatingContextMenu} style={getContextMenuInitialStyle()}
+                className="ctx-menu chat-floating-ctx-menu chat-room-context-menu" data-role={m.role}>
+                    <>
+                        <div className="chat-context-menu-grid">
+                            <button type="button" className="ctx-menu-btn" onClick={() => { copyTextToClipboard(m.content); closeContextMenu(); }}>
+                                <Copy {...menuIconProps} /><span>Copy</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" onClick={() => m.role === "assistant" ? handleEditResponseStart(m) : handleEditMessageStart(m)}>
+                                <FilePenLine {...menuIconProps} /><span>Edit</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" onClick={() => { setQuotingMessage(m); closeContextMenu(); }}>
+                                <Quote {...menuIconProps} /><span>Quote</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" disabled title="Reaction picker coming next">
+                                <Smile {...menuIconProps} /><span>React</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" disabled={options?.allowMultiSelect === false} onClick={() => startMultiSelectFromMessage(m)}>
+                                <ListChecks {...menuIconProps} /><span>Select</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" disabled={!canAnnotate} aria-pressed={!!m.favoritedAt}
+                                onClick={() => {
+                                    const updated = toggleChatMessageFavorite(storedMessageId);
+                                    if (updated) setMessages(previous => previous.map(message => message.id === updated.id ? updated : message));
+                                    closeContextMenu();
+                                }}>
+                                <Star {...menuIconProps} fill={m.favoritedAt ? "currentColor" : "none"} /><span>Favorite</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn ctx-menu-btn-danger" onClick={() => handleDeleteMessage(storedMessageId)}>
+                                <Trash2 {...menuIconProps} /><span>Delete</span>
+                            </button>
+                            <button type="button" className="ctx-menu-btn" disabled title="Single-bubble regeneration is coming in the next phase">
+                                <RotateCcw {...menuIconProps} /><span>Regenerate</span>
+                            </button>
+                        </div>
+                        {pluginActions.length > 0 && <div className="chat-context-plugin-actions chat-context-menu-grid">
+                            {pluginActions.map(action => (
+                                <button key={action.pluginId + ":" + action.id} type="button" className="ctx-menu-btn"
+                                    onClick={() => { getChatPluginRuntime().runMessageAction(action, m); closeContextMenu(); }}>
+                                    <Blocks {...menuIconProps} /><span>{action.label}</span>
+                                </button>
+                            ))}
+                        </div>}
+                    </>
                 <div data-menu-triangle className="ctx-menu-triangle absolute -top-[6px] w-0 h-0" />
             </div>
         );
@@ -5408,6 +5366,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     freshStateValues: freshStateValuesHere,
                     displayProjected: true,
                     displaySourceId: sourceId,
+                    reactions: id === sourceId ? base.reactions : undefined,
+                    favoritedAt: id === sourceId ? base.favoritedAt : undefined,
                 });
             });
             // 投影后没有任何消息驮面板（比如整段只剩拍一拍/通话留痕）→ 补一条空投影消息
