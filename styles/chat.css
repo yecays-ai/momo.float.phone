@@ -1100,20 +1100,20 @@
 }
 
 .chat-room-context-menu.ctx-menu {
-  --ctx-menu-bg: rgba(255, 249, 249, 0.88);
-  width: min(344px, calc(100vw - 24px));
+  --ctx-menu-bg: rgba(248, 245, 246, 0.78);
+  width: min(312px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
   max-height: calc(100dvh - 16px);
-  padding: 12px;
+  padding: 10px;
   border: 1px solid rgba(232, 217, 217, 0.7);
   border-radius: 24px;
   background: var(--ctx-menu-bg);
   box-shadow:
-    0 22px 52px rgba(15, 23, 42, 0.24),
-    0 4px 14px rgba(15, 23, 42, 0.12),
+    0 12px 30px rgba(15, 23, 42, 0.14),
+    0 3px 10px rgba(15, 23, 42, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  -webkit-backdrop-filter: blur(26px) saturate(180%);
-  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
   white-space: normal;
   overflow-x: visible;
   overflow-y: auto;
@@ -1133,13 +1133,13 @@
 
 .chat-room-context-menu .ctx-menu-btn {
   min-width: 0;
-  min-height: 68px;
-  padding: 9px 4px 8px;
+  min-height: 60px;
+  padding: 7px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 5px;
   border: 1px solid rgba(225, 214, 218, 0.52);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.58);
@@ -1185,7 +1185,7 @@
 
 @media (max-width: 350px) {
   .chat-room-context-menu.ctx-menu {
-    width: calc(100vw - 16px);
+    width: min(312px, calc(100vw - 16px));
     max-width: calc(100vw - 16px);
     padding: 10px;
     border-radius: 22px;
@@ -1196,7 +1196,7 @@
   }
 
   .chat-room-context-menu .ctx-menu-btn {
-    min-height: 64px;
+    min-height: 58px;
     font-size: calc(12px*var(--app-text-scale,1));
   }
 }

@@ -476,6 +476,7 @@ type OfflineActionTarget = {
 type ContextMenuAnchor = {
     x: number;
     y: number;
+    element?: HTMLElement;
 };
 
 type RenderChatMessage = ChatMessage & {
@@ -1310,6 +1311,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // Message Actions state
     const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
     const [contextMenuAnchor, setContextMenuAnchor] = useState<ContextMenuAnchor | null>(null);
+    const contextMenuPositionRef = useRef<(() => void) | null>(null);
     const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
     const [selectedMessageIds, setSelectedMessageIds] = useState<Set<string>>(new Set());
     const [showConfirmMultiDelete, setShowConfirmMultiDelete] = useState(false);
@@ -1435,14 +1437,55 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const getContextMenuInitialStyle = () => {
         const anchor = contextMenuAnchor;
         if (!anchor) return { left: 0, top: 0 };
+        if (anchor.element) {
+            const rect = anchor.element.getBoundingClientRect();
+            return { left: rect.left, top: rect.bottom + 10, visibility: "hidden" as const };
+        }
         return { left: anchor.x, top: Math.max(8, anchor.y - 90) };
     };
 
     const positionFloatingContextMenu = (el: HTMLDivElement | null) => {
+        contextMenuPositionRef.current = null;
         if (!el || !contextMenuAnchor) return;
         const margin = 8;
         const gap = 12;
         const anchor = contextMenuAnchor;
+        if (anchor.element) {
+            const position = () => {
+                if (!el.isConnected || !anchor.element?.isConnected) return;
+                const rect = anchor.element.getBoundingClientRect();
+                const viewport = window.visualViewport;
+                const viewportLeft = viewport?.offsetLeft ?? 0;
+                const viewportTop = viewport?.offsetTop ?? 0;
+                const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth);
+                const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+                const bubbleGap = 10;
+                el.style.maxWidth = `${Math.max(0, viewportRight - viewportLeft - margin * 2)}px`;
+                el.style.maxHeight = `${Math.max(0, viewportBottom - viewportTop - margin * 2)}px`;
+                const naturalHeight = el.scrollHeight + el.offsetHeight - el.clientHeight;
+                const below = Math.max(0, viewportBottom - margin - Math.max(rect.bottom + bubbleGap, viewportTop + margin));
+                const above = Math.max(0, Math.min(rect.top - bubbleGap, viewportBottom - margin) - viewportTop - margin);
+                const placeBelow = naturalHeight <= below || (naturalHeight > above && below >= above);
+                const availableHeight = placeBelow ? below : above;
+                el.style.maxHeight = `${availableHeight}px`;
+                el.style.overflowY = "auto";
+                const menuWidth = el.offsetWidth;
+                const left = Math.max(viewportLeft + margin, Math.min(
+                    (rect.left + rect.right - menuWidth) / 2,
+                    viewportRight - margin - menuWidth,
+                ));
+                el.style.left = `${left}px`;
+                el.style.top = `${placeBelow
+                    ? Math.max(rect.bottom + bubbleGap, viewportTop + margin)
+                    : Math.min(rect.top - bubbleGap, viewportBottom - margin) - el.offsetHeight}px`;
+                el.style.right = "auto";
+                el.style.bottom = "auto";
+                el.style.visibility = "visible";
+            };
+            contextMenuPositionRef.current = position;
+            position();
+            return;
+        }
         const menuW = el.offsetWidth;
         const menuH = el.offsetHeight;
         const viewportW = window.innerWidth;
@@ -1475,6 +1518,32 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             }
         }
     };
+
+    useEffect(() => {
+        if (!contextMenuAnchor?.element) return;
+        let frame = 0;
+        const liftEndsAt = performance.now() + 180;
+        const trackLift = () => {
+            contextMenuPositionRef.current?.();
+            if (performance.now() < liftEndsAt) frame = requestAnimationFrame(trackLift);
+        };
+        const reposition = () => contextMenuPositionRef.current?.();
+        frame = requestAnimationFrame(trackLift);
+        window.addEventListener("resize", reposition);
+        window.addEventListener("scroll", reposition, true);
+        window.visualViewport?.addEventListener("resize", reposition);
+        window.visualViewport?.addEventListener("scroll", reposition);
+        const observer = new ResizeObserver(reposition);
+        observer.observe(contextMenuAnchor.element);
+        return () => {
+            cancelAnimationFrame(frame);
+            observer.disconnect();
+            window.removeEventListener("resize", reposition);
+            window.removeEventListener("scroll", reposition, true);
+            window.visualViewport?.removeEventListener("resize", reposition);
+            window.visualViewport?.removeEventListener("scroll", reposition);
+        };
+    }, [contextMenuAnchor]);
 
     // --- Music action queue: send music operations as system messages ---
     useEffect(() => {
@@ -4235,7 +4304,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const handleOfflinePointerDown = (e: React.PointerEvent, target: OfflineActionTarget) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         e.preventDefault();
-        const anchor = { x: e.clientX, y: e.clientY };
+        const anchor = { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement };
         startPosRef.current = anchor;
         longPressTriggeredRef.current = false;
         if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
@@ -4891,7 +4960,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // Prevent text selection on long press
         e.preventDefault();
 
-        const anchor = { x: e.clientX, y: e.clientY };
+        const anchor = { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement };
         startPosRef.current = anchor;
         longPressTriggeredRef.current = false;
 
@@ -5864,7 +5933,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                         }
                                     }}
-                                    onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(`vc-${vcGroup.startId}`, { x: e.clientX, y: e.clientY }); }}
+                                    onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(`vc-${vcGroup.startId}`, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                     onClick={() => {
                                         if (activeMessageId === `vc-${vcGroup.startId}`) return;
                                         setExpandedVoiceCallIds(prev => {
@@ -5916,7 +5985,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                                 if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                                             }
                                                         }}
-                                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(gMsg.id, { x: e.clientX, y: e.clientY }); }}
+                                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(gMsg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                                         className="chat-sys-msg relative cursor-pointer"
                                                         {...(activeMessageId === gMsg.id ? { "data-active": "" } : {})}
                                                     >
@@ -5942,7 +6011,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                                     if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                                                 }
                                                             }}
-                                                            onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(gMsg.id, { x: e.clientX, y: e.clientY }); }}
+                                                            onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(gMsg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                                             className={`chat-bubble-role-${gMsg.role} py-2 px-3 rounded-md break-words relative cursor-pointer`}
                                                             {...(activeMessageId === gMsg.id ? { "data-active": "" } : {})}
                                                         >
@@ -6073,7 +6142,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                             }
                                         }}
-                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY }); }}
+                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                         className={isCompactSystemInstruction
                                             ? "chat-sys-msg break-all max-w-[90%] relative cursor-pointer"
                                             : isSystemInstruction
@@ -6140,7 +6209,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                             }
                                         }}
-                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY }); }}
+                                        onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                         className="chat-sys-msg mx-auto relative cursor-pointer"
                                         {...(activeMessageId === msg.id ? { "data-active": "" } : {})}
                                     >
@@ -6164,7 +6233,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                             if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                                         }
                                                     }}
-                                                    onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY }); }}
+                                                    onContextMenu={(e) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); }}
                                                     onClick={(e) => {
                                                         if (activeMessageId === msg.id) return;
                                                         e.stopPropagation();
@@ -6224,7 +6293,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                         if (dx > 10 || dy > 10) handleMessagePointerCancel();
                                                     }
                                                 },
-                                                onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY }); },
+                                                onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); openMessageContextMenu(msg.id, { x: e.clientX, y: e.clientY, element: e.currentTarget as HTMLElement }); },
                                             } : {})}
                                             className={`chat-bubble-role-${msg.role} ${isMediaBubble ? "chat-bubble-media" : ""} ${isStandaloneHtmlPreview ? "chat-bubble-html-preview" : ""} ${renderMsg.mediaType === "music_share" ? "chat-bubble-music-share" : ""} ${renderMsg.mediaType === "gift" || renderMsg.mediaType === "image" || isStandaloneHtmlPreview ? "rounded-none" : "rounded-md"} break-words relative cursor-pointer select-none`}
                                             style={isStandaloneHtmlPreview ? STANDALONE_CARD_BUBBLE_STYLE : undefined}
