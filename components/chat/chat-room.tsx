@@ -52,7 +52,7 @@ import { useKeyboardDismissAutoSend } from "@/components/chat/use-keyboard-dismi
 import { cancelBailoutKey } from "@/lib/push-bailout-client";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import type { UserIdentity } from "@/components/settings/user-identity";
-import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
+import { AlertCircle, Blocks, Check, Copy, FilePenLine, FileText, ListChecks, ListX, Quote, RotateCcw, Trash2, Undo2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
 import { setDebugChatState } from "@/lib/debug-store";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { setChatActive } from "@/lib/music-action-queue";
@@ -5037,14 +5037,15 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     /** Reusable context menu for user/assistant bubbles */
     const renderBubbleContextMenu = (m: ChatMessage, options?: { allowMultiSelect?: boolean }) => {
         const storedMessageId = getStoredActionMessageId(m);
+        const menuIconProps = { size: 22, strokeWidth: 1.75, "aria-hidden": true as const };
         const menu = (
             <div
                 onPointerDown={e => e.stopPropagation()}
                 ref={positionFloatingContextMenu}
                 style={getContextMenuInitialStyle()}
-                className="ctx-menu chat-floating-ctx-menu flex flex-col items-center gap-[6px] py-[4px] px-0"
+                className="ctx-menu chat-floating-ctx-menu chat-room-context-menu"
                 data-role={m.role}>
-                <div className="flex">
+                <div className="chat-context-menu-grid">
                     <button onClick={() => {
                         const text = m.content;
                         const fallbackCopy = () => {
@@ -5063,47 +5064,69 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             fallbackCopy();
                         }
                         setActiveMessageId(null);
-                    }} className="ctx-menu-btn">复制</button>
+                    }} className="ctx-menu-btn">
+                        <Copy {...menuIconProps} />
+                        <span>复制</span>
+                    </button>
                     <button onClick={() => (m.role === "assistant" ? handleEditResponseStart(m) : handleEditMessageStart(m))} className="ctx-menu-btn">
-                        {m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}
+                        <FilePenLine {...menuIconProps} />
+                        <span>{m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}</span>
                     </button>
                     {m.mediaType === "audio" && m.mediaData?.label && (
-                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">转文字</button>
+                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">
+                            <FileText {...menuIconProps} />
+                            <span>转文字</span>
+                        </button>
                     )}
                     {m.role === "user" && (
-                        <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">撤回消息</button>
+                        <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">
+                            <Undo2 {...menuIconProps} />
+                            <span>撤回消息</span>
+                        </button>
                     )}
                     {m.role === "assistant" && (
-                        <button onClick={() => handleRetry(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">重试以下</button>
+                        <button onClick={() => handleRetry(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
+                            <RotateCcw {...menuIconProps} />
+                            <span>重试以下</span>
+                        </button>
                     )}
-                </div>
-                <div className="flex">
-                    <button onClick={() => { setQuotingMessage(m); setActiveMessageId(null); }} className="ctx-menu-btn">引用</button>
+                    <button onClick={() => { setQuotingMessage(m); setActiveMessageId(null); }} className="ctx-menu-btn">
+                        <Quote {...menuIconProps} />
+                        <span>引用</span>
+                    </button>
                     {options?.allowMultiSelect !== false && (
-                        <button onClick={() => startMultiSelectFromMessage(m)} className="ctx-menu-btn">多选</button>
+                        <button onClick={() => startMultiSelectFromMessage(m)} className="ctx-menu-btn">
+                            <ListChecks {...menuIconProps} />
+                            <span>多选</span>
+                        </button>
                     )}
-                    <button onClick={() => handleDeleteMessage(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">删除</button>
-                    <button onClick={() => handleDeleteMessagesFrom(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">删除以下</button>
-                </div>
+                    <button onClick={() => handleDeleteMessage(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
+                        <Trash2 {...menuIconProps} />
+                        <span>删除</span>
+                    </button>
+                    <button onClick={() => handleDeleteMessagesFrom(storedMessageId)} className="ctx-menu-btn ctx-menu-btn-danger">
+                        <ListX {...menuIconProps} />
+                        <span>删除以下</span>
+                    </button>
                 {(() => {
                     // 聊天插件注册的消息操作菜单项
                     const pluginActions = getChatPluginRuntime().getMessageActions(m);
                     if (pluginActions.length === 0) return null;
-                    return (
-                        <div className="flex">
-                            {pluginActions.map(action => (
-                                <button
-                                    key={`${action.pluginId}:${action.id}`}
-                                    className="ctx-menu-btn"
-                                    onClick={() => {
-                                        getChatPluginRuntime().runMessageAction(action, m);
-                                        setActiveMessageId(null);
-                                    }}
-                                >{action.label}</button>
-                            ))}
-                        </div>
-                    );
+                    return pluginActions.map(action => (
+                        <button
+                            key={`${action.pluginId}:${action.id}`}
+                            className="ctx-menu-btn"
+                            onClick={() => {
+                                getChatPluginRuntime().runMessageAction(action, m);
+                                setActiveMessageId(null);
+                            }}
+                        >
+                            <Blocks {...menuIconProps} />
+                            <span>{action.label}</span>
+                        </button>
+                    ));
                 })()}
+                </div>
                 <div data-menu-triangle className="ctx-menu-triangle absolute -top-[6px] w-0 h-0" />
             </div>
         );
@@ -5568,7 +5591,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     } : undefined;
 
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})} {...(activeMessageId || activeOfflineTarget ? { "data-context-menu-open": "" } : {})}>
             {/* CSS priority: session > global chat info > homepage appearance CSS. */}
             {globalChatCSS && (
                 <SessionCustomCSS css={globalChatCSS} scope={`.session-${session.id}`} />
@@ -5576,6 +5599,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             {liveCSS && (
                 <SessionCustomCSS css={liveCSS} scope={`.session-${session.id}`} />
             )}
+
+            {(activeMessageId || activeOfflineTarget) && <div className="chat-context-menu-backdrop" aria-hidden="true" />}
 
             {/* 全屏特效层（表情雨/礼花），不拦截任何触摸操作 */}
             <ChatScreenEffectOverlay active={activeScreenEffect} onDone={() => setActiveScreenEffect(null)} />
