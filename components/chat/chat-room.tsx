@@ -5096,11 +5096,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 <div className="flex">
                     <button onClick={() => { copyTextToClipboard(getOfflineCopyText(turn, role)); setActiveOfflineTarget(null); }} className="ctx-menu-btn">复制</button>
                     <button onClick={() => handleOfflineEditStart(turn, role)} className="ctx-menu-btn">编辑</button>
-                    <button onClick={() => void handleOfflineRetryFrom(turn.id)} className="ctx-menu-btn ctx-menu-btn-danger">重试以下</button>
                 </div>
                 <div className="flex">
                     <button onClick={() => handleOfflineDeleteTurn(turn.id)} className="ctx-menu-btn ctx-menu-btn-danger">删除</button>
-                    <button onClick={() => handleOfflineDeleteTurnsFrom(turn.id)} className="ctx-menu-btn ctx-menu-btn-danger">删除以下</button>
                 </div>
                 <div data-menu-triangle className="ctx-menu-triangle absolute -top-[6px] w-0 h-0" />
             </div>
