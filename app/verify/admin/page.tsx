@@ -120,7 +120,7 @@ export default function VerifyAdminPage() {
   }, [unlocked]);
 
   useEffect(() => {
-    document.title = "Float · 审核台";
+    document.title = "Pep · 审核台";
     try {
       const saved = window.localStorage.getItem(ADMIN_KEY_STORAGE) || "";
       if (saved) { setKey(saved); void refresh(saved, "pending"); }
@@ -153,7 +153,7 @@ export default function VerifyAdminPage() {
 
   return (
     <main className="vr-root">
-      <div className="vr-brand">Float</div>
+      <div className="vr-brand">Pep</div>
       <div className="vr-brand-sub">资格审核台 · Admin</div>
 
       <section className="vr-card" style={{ maxWidth: 560 }}>

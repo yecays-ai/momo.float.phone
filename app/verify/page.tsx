@@ -47,7 +47,7 @@ export default function VerifyPage() {
   }
 
   useEffect(() => {
-    document.title = "Float · 内测资格申请";
+    document.title = "Pep · 内测资格申请";
     try {
       const saved = window.localStorage.getItem(QUERY_CODE_KEY) || "";
       if (saved) {
@@ -118,7 +118,7 @@ export default function VerifyPage() {
 
   return (
     <main className="vr-root">
-      <div className="vr-brand">Float</div>
+      <div className="vr-brand">Pep</div>
       <div className="vr-brand-sub">内测资格申请 · Adult Verification</div>
 
       <section className="vr-card">
@@ -234,7 +234,7 @@ export default function VerifyPage() {
       </section>
 
       <a className="vr-back" href="/">← 返回登录页</a>
-      <div className="vr-footer">FLOAT · LIMITED BETA</div>
+      <div className="vr-footer">PEP · LIMITED BETA</div>
     </main>
   );
 }

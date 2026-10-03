@@ -20,7 +20,7 @@ export function VerificationApplicationsClosed() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    document.title = "Float · 资格查询";
+    document.title = "Pep · 资格查询";
     try {
       setCheckCode(window.localStorage.getItem(QUERY_CODE_KEY) || "");
     } catch { /* ignore */ }
@@ -64,7 +64,7 @@ export function VerificationApplicationsClosed() {
 
   return (
     <main className="vr-root">
-      <div className="vr-brand">Float</div>
+      <div className="vr-brand">Pep</div>
       <div className="vr-brand-sub">访问资格查询 · Adult Verification</div>
 
       <section className="vr-card">
@@ -110,7 +110,7 @@ export function VerificationApplicationsClosed() {
       </section>
 
       <a className="vr-back" href="/">← 返回登录页</a>
-      <div className="vr-footer">FLOAT · ACCESS STATUS</div>
+      <div className="vr-footer">PEP · ACCESS STATUS</div>
     </main>
   );
 }

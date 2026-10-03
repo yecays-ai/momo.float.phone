@@ -58,7 +58,7 @@ export default function AppMarketAdminPage() {
   }, [unlocked]);
 
   useEffect(() => {
-    document.title = "Float · 应用市场审核台";
+    document.title = "Pep · 应用市场审核台";
     try {
       const saved = window.localStorage.getItem(ADMIN_KEY_STORAGE) || "";
       if (saved) {

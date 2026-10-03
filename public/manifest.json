@@ -1,7 +1,7 @@
 {
-    "name": "float",
-    "short_name": "float",
-    "description": "float",
+    "name": "Pep Phone",
+    "short_name": "Pep",
+    "description": "Pep Phone",
     "id": "/",
     "start_url": "/",
     "scope": "/",

@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     window.location.replace("/");
   }, 800);
 </script>
-<p>授权完成，正在返回 Float...</p>
+<p>授权完成，正在返回 Pep...</p>
 </body></html>`;
 
     return new NextResponse(html, {
